@@ -1,0 +1,54 @@
+<html>
+    <head>
+        <title>S3Ajax Play</title>
+        <link href="css/play.css" rel="stylesheet" type="text/css" />
+        <script src="js/MochiKit/MochiKit.js" type="text/javascript"></script>
+        <script src="js/sha1.js" type="text/javascript"></script>
+        <script src="js/formatDate.js" type="text/javascript"></script>
+        <script src="js/S3Ajax.js" type="text/javascript"></script>
+        <script src="js/play.js" type="text/javascript"></script>
+    </head>
+    <body>
+        <h1>S3Ajax Play</h1>
+
+        <h2>Credentials</h2>
+
+        <form id="credentials" onSubmit="Play.login(this); return false;">
+
+            <label for="key_id">AWSAccessKey</label>
+            <input type="text" size="50" id="key_id" name="key_id" /><br />
+            
+            <label for="secret_key">SecretAccessKey</label>
+            <input type="text" size="50" id="secret_key" name="secret_key" /><br />
+
+            <button id="login" onClick="Play.login(this); return false">
+                Update credentials
+            </button>
+            <span id="update_msg"></span>
+
+        </form>
+
+        <h2>Content transfer</h2>
+
+        <form id="xfers" onSubmit="Play.download(this); return false;">
+
+            <label for="resource">Resource</label>
+            <input type="text" size="50" id="resource" name="resource" value="/test" /><br />
+
+            <label for="content">Content</label>
+            <textarea id="content" name="content" cols="70" rows="10"></textarea><br />
+
+            <button id="download" onClick="Play.download(this); return false">
+                Download
+            </button>
+            <button id="upload" onClick="Play.upload(this); return false">
+                Upload
+            </button>
+            <span id="xfer_msg"></span>
+
+        </form>
+
+        <div id="main"></div>
+    </body>
+</html>
+

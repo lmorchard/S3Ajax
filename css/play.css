@@ -1,0 +1,14 @@
+body, td, p, div {
+    font: 12px arial;
+}
+
+#credentials label, 
+#xfers label {
+    float: left;
+    width: 15ex;
+    text-align: right;
+    margin-right: 1ex;
+}
+#login, #download {
+    margin-left: 16ex;
+}
