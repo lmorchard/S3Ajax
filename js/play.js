@@ -40,6 +40,9 @@ Play = {
             S3Ajax.SECRET_KEY = dojo.storage.get('secret_key', '/S3Ajax');
             $('key_id').value = S3Ajax.KEY_ID;
             $('update_msg').innerHTML = 'Credentials fetched from local storage: '+(new Date());
+
+            // this.listbuckets();
+            // this.list();
         }
     },
 
@@ -152,6 +155,31 @@ Play = {
     },
 
     /**
+    */
+    deletebucket: function() {
+        var _this = this;
+        var sel = this.getSelected('buckets_list');
+        if (!sel.length) return;
+
+        this.setList('buckets_list',['Deleting...','']);
+        S3Ajax.deleteBucket(sel[0], function() {
+            _this.listbuckets();
+        });
+    },
+
+    /**
+    */
+    createbucket: function() {
+        var _this = this;
+        var bucket = $('list_bucket').value;
+
+        this.setList('buckets_list',['Creating...','']);
+        S3Ajax.createBucket(bucket, function() {
+            _this.listbuckets();
+        });
+    },
+
+    /**
         List a bucket's contents.
     */
     list: function() {
@@ -205,7 +233,7 @@ Play = {
 
         S3Ajax.deleteKeys($('list_bucket').value, sel_keys, 
             function(key)      { logFire("Deleted "+key); },
-            function(req, obj) { logFire("Deleted all"); }
+            function(req, obj) { logFire("Deleted all"); _this.list(); }
         );
     },
 

@@ -43,6 +43,7 @@ S3Ajax = {
     SECRET_KEY: '',
 
     /**
+        Get contents of a key in a bucket.
     */
     get: function(bucket, key, cb, err_cb) {
         return this.httpClient({
@@ -59,11 +60,11 @@ S3Ajax = {
     },
 
     /**
-        TODO: Figure out how to provide shorter argument list versions
+        Put data into a key in a bucket.
     */
     put: function(bucket, key, content/*, [params], cb, [err_cb]*/) {
 
-        // Process variable arguments.
+        // Process variable arguments for optional params.
         var idx = 3;
         var params = {};
         if (typeof arguments[idx] == 'object')
@@ -97,17 +98,29 @@ S3Ajax = {
         List buckets belonging to the account.
     */
     listBuckets: function(cb, err_cb) {
-        return this.httpClient({
-            method:   'GET',
-            resource: '/',
-            load: function(req, obj) {
-                if (cb) cb(req, obj);
-            },
-            error: function(req) {
-                if (err_cb) err_cb(req, obj);
-                if (cb) cb(req, obj);
-            }
-        })
+        return this.httpClient({ 
+            method:'GET', resource:'/', 
+            force_lists: [ 'ListAllMyBucketsResult.Buckets.Bucket' ],
+            load: cb, error:err_cb 
+        });
+    },
+
+    /**
+        Create a new bucket for this account.
+    */
+    createBucket: function(bucket, cb, err_cb) {
+        return this.httpClient({ 
+            method:'PUT', resource:'/'+bucket, load:cb, error:err_cb 
+        });
+    },
+
+    /**
+        Delete an empty bucket.
+    */
+    deleteBucket: function(bucket, cb, err_cb) {
+        return this.httpClient({ 
+            method:'DELETE', resource:'/'+bucket, load:cb, error:err_cb 
+        });
     },
 
     /**
@@ -115,16 +128,9 @@ S3Ajax = {
     */
     listKeys: function(bucket, params, cb, err_cb) {
         return this.httpClient({
-            method:   'GET',
-            resource: '/' + bucket,
-            params:   params,
-            load: function(req, obj) {
-                if (cb) cb(req, obj);
-            },
-            error: function(req) {
-                if (err_cb) err_cb(req, obj);
-                if (cb) cb(req, obj);
-            }
+            method:'GET', resource: '/'+bucket, 
+            force_lists: [ 'ListBucketResult.Contents' ],
+            params:params, load:cb, error:err_cb
         });
     },
 
@@ -132,16 +138,8 @@ S3Ajax = {
         Delete a single key in a bucket.
     */
     deleteKey: function(bucket, key, cb, err_cb) {
-        this.httpClient({
-            method:   'DELETE',
-            resource: '/'+bucket+'/'+key,
-            load: function(req, obj) {
-                if (cb) return cb(req,obj);
-            },
-            error: function(req, obj) {
-                if (err_cb) return err_cb(req,obj);
-                if (cb) return cb(req,obj);
-            }
+        return this.httpClient({
+            method:'DELETE', resource: '/'+bucket+'/'+key, load:cb, error:err_cb
         });
     },
 
@@ -241,7 +239,7 @@ S3Ajax = {
                 // Pre-digest the XML if needed.
                 var obj = null;
                 if (req.responseXML && kwArgs.parseXML != false)
-                    obj = _this.xmlToObj(req.responseXML);
+                    obj = _this.xmlToObj(req.responseXML, kwArgs.force_lists);
 
                 // Stash away the last request details, if DEBUG active.
                 if (_this.DEBUG) {
@@ -265,9 +263,8 @@ S3Ajax = {
         JavaScript object.
 
         TODO: Handle attributes?
-        TODO: Force list for certain paths (ie. lists of one item)
     */
-    xmlToObj: function(parent) {
+    xmlToObj: function(parent, force_lists, path) {
         var obj = {};
         var cdata = '';
         var is_struct = false;
@@ -278,11 +275,19 @@ S3Ajax = {
             } else {
                 is_struct = true;
                 var name  = node.nodeName;
-                var val   = arguments.callee(node);
+                var cpath = (path) ? path+'.'+name : name;
+                var val   = arguments.callee(node, force_lists, cpath);
 
                 if (!obj[name]) {
-                    // No such key yet, so start with a single value.
-                    obj[name] = val;
+                    var do_force_list = false;
+                    if (force_lists) {
+                        for (var j=0,item; item=force_lists[j]; j++) {
+                            if (item == cpath) {
+                                do_force_list=true; break;
+                            }
+                        }
+                    }
+                    obj[name] = (do_force_list) ? [ val ] : val;
                 } else if (obj[name].length) {
                     // This is a list of values to append this one to the end.
                     obj[name].push(val);

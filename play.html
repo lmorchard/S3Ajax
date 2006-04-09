@@ -42,15 +42,19 @@
             <fieldset>
                 <legend>Bucket Management</legend>
 
-                <select id="buckets_list" name="buckets_list" size="5" multiple="multiple"></select>
+                <select id="buckets_list" name="buckets_list" size="5" multiple="multiple" 
+                        onChange="Play.selectbucket(this);"></select>
 
                 <label for="list_bucket">Current Bucket</label>
                 <input type="text" size="15" name="list_bucket" id="list_bucket" value="decafbad" /><br />
 
-                <button id="listbuckets" onClick="Play.listbuckets(this); return false"> List </button>
+                <button id="listbuckets" onClick="Play.listbuckets(this); return false"> Refresh </button>
+                <!--
                 <button id="selectbucket" onClick="Play.selectbucket(this); return false"> Select </button>
+                -->
+                <button id="selectbucket" onClick="Play.createbucket(this); return false"> Create </button>
                 &nbsp;&nbsp;&nbsp;&nbsp;
-                <button id="delete_buckets" onClick="Play.deleteSelectedbuckets(this); return false"> Delete </button>
+                <button id="delete_buckets" onClick="Play.deletebucket(this); return false"> Delete </button>
 
             </fieldset>
         </form>
