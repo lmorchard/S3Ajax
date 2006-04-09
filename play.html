@@ -3,13 +3,13 @@
         <title>S3Ajax Play</title>
 
         <!--
-        <script src="js/config.js" type="text/javascript"></script>
         <script src="js/MochiKit/MochiKit.js" type="text/javascript"></script>
         <script src="js/dojo.js" type="text/javascript"></script>
-        <script type="text/javascript"
-                src="http://o.aolcdn.com/iamalpha/.resource/jssdk/dojo-0.2.2/dojo.js"></script>
         <script src="js/md5.js" type="text/javascript"></script>
         -->
+        <script src="js/config.js" type="text/javascript"></script>
+        <script type="text/javascript"
+                src="http://o.aolcdn.com/iamalpha/.resource/jssdk/dojo-0.2.2/dojo.js"></script>
         <script src="js/sha1.js" type="text/javascript"></script>
         <script src="js/formatDate.js" type="text/javascript"></script>
         <script src="js/S3Ajax.js" type="text/javascript"></script>
@@ -20,40 +20,78 @@
     <body>
         <h1>S3Ajax Play</h1>
 
-        <h2>Credentials</h2>
-
         <form id="credentials" onSubmit="Play.login(this); return false;">
+            <fieldset>
+                <legend>Credentials</legend>
 
-            <label for="key_id">AWSAccessKey</label>
-            <input type="text" size="50" id="key_id" name="key_id" /><br />
-            
-            <label for="secret_key">SecretAccessKey</label>
-            <input type="password" size="50" id="secret_key" name="secret_key" /><br />
+                <label for="key_id">AWSAccessKey</label>
+                <input type="text" size="50" id="key_id" name="key_id" /><br />
+                
+                <label for="secret_key">SecretAccessKey</label>
+                <input type="password" size="50" id="secret_key" name="secret_key" /><br />
 
-            <button id="login" onClick="Play.login(this); return false"> Store </button>
-            <button id="recall" onClick="Play.recall(this); return false"> Recall </button>
-            
-            <span id="update_msg"></span>
+                <button id="login" onClick="Play.login(this); return false"> Store </button>
+                <button id="recall" onClick="Play.recall(this); return false"> Recall </button>
+                
+                <span id="update_msg"></span>
 
+            </fieldset>
         </form>
 
-        <h2>Content transfer</h2>
+        <form id="bucket_manage" onSubmit="return false;">
+            <fieldset>
+                <legend>Bucket Management</legend>
+
+                <select id="buckets_list" name="buckets_list" size="5" multiple="multiple"></select>
+
+                <label for="list_bucket">Current Bucket</label>
+                <input type="text" size="15" name="list_bucket" id="list_bucket" value="decafbad" /><br />
+
+                <button id="listbuckets" onClick="Play.listbuckets(this); return false"> List </button>
+                <button id="selectbucket" onClick="Play.selectbucket(this); return false"> Select </button>
+                &nbsp;&nbsp;&nbsp;&nbsp;
+                <button id="delete_buckets" onClick="Play.deleteSelectedbuckets(this); return false"> Delete </button>
+
+            </fieldset>
+        </form>
+
+        <form id="key_manage" onSubmit="return false;">
+            <fieldset>
+                <legend>Key Management</legend>
+
+                <select id="keys_list" name="keys_list" size="18" multiple="multiple"></select>
+
+                <label for="list_prefix">Prefix</label>
+                <input type="text" size="15" name="list_prefix" id="list_prefix" /><br />
+                <label for="list_maxkeys">Maxkeys</label>
+                <input type="text" size="15" name="list_maxkeys" id="list_maxkeys" /><br />
+                <label for="list_marker">Marker</label>
+                <input type="text" size="15" name="list_marker" id="list_marker" /><br />
+
+                <button id="list_keys" onClick="Play.list(this); return false"> List </button>
+                <button id="get_key" onClick="Play.downloadSelectedKey(this); return false"> Get </button>
+                &nbsp;&nbsp;&nbsp;&nbsp;
+                <button id="delete_keys" onClick="Play.deleteSelectedKeys(this); return false"> Delete </button>
+
+            </fieldset>
+        </form>
 
         <form id="xfers" onSubmit="Play.download(this); return false;">
+            <fieldset>
+                <legend>Content Transfer</legend>
 
-            <label for="resource">Resource</label>
-            <input type="text" size="50" id="resource" name="resource" value="/decafbad/" /><br />
+                <label for="key">Key</label>
+                <input type="text" size="50" id="key" name="key" value="test" /><br />
 
-            <label for="content">Content</label>
-            <textarea id="content" name="content" cols="70" rows="20"></textarea><br />
+                <label for="content">Content</label>
+                <textarea id="content" name="content" cols="96" rows="30"></textarea><br />
 
-            <button id="download" onClick="Play.download(this); return false"> Download </button>
-            <button id="upload" onClick="Play.upload(this); return false"> Upload </button>
-            <button id="listbuckets" onClick="Play.listbuckets(this); return false"> List Buckets </button>
-            <button id="list" onClick="Play.list(this); return false"> List </button>
+                <button id="download" onClick="Play.download(this); return false"> Download </button>
+                <button id="upload" onClick="Play.upload(this); return false"> Upload </button>
+                
+                <span id="xfer_msg"></span>
 
-            <span id="xfer_msg"></span>
-
+            </fieldset>
         </form>
 
     </body>

@@ -20,9 +20,12 @@ S3Ajax = {
     // Defeat caching with query params on GET requests?
     DEFEAT_CACHE: false,
 
-    // Skip using Dojo or MochiKit XMLHttpRequest facilities
-    USE_CUSTOM_XHR: true,
+    // Default ACL to use when uploading keys.
+    DEFAULT_ACL: 'public-read',
     
+    // Default content-type to use in uploading keys.
+    DEFAULT_CONTENT_TYPE: 'text/plain',
+
     /**
         DANGER WILL ROBINSON - Do NOT fill in your KEY_ID and SECRET_KEY 
         here.  These should be supplied by client-side code, and not 
@@ -38,6 +41,128 @@ S3Ajax = {
     URL:        'http://s3.amazonaws.com',
     KEY_ID:     '',
     SECRET_KEY: '',
+
+    /**
+    */
+    get: function(bucket, key, cb, err_cb) {
+        return this.httpClient({
+            method:   'GET',
+            resource: '/' + bucket + '/' + key,
+            load: function(req, obj) {
+                if (cb) cb(req, req.responseText);
+            },
+            error: function(req) {
+                if (err_cb) err_cb(req, obj);
+                if (cb) cb(req, req.responseText);
+            }
+        })
+    },
+
+    /**
+        TODO: Figure out how to provide shorter argument list versions
+    */
+    put: function(bucket, key, content/*, [params], cb, [err_cb]*/) {
+
+        // Process variable arguments.
+        var idx = 3;
+        var params = {};
+        if (typeof arguments[idx] == 'object')
+            params = arguments[idx++];
+        var cb     = arguments[idx++];
+        var err_cb = arguments[idx++];
+
+        if (!params.content_type) 
+            params.content_type = this.DEFAULT_CONTENT_TYPE;
+        if (!params.acl)
+            params.acl = this.DEFAULT_ACL;
+
+        return this.httpClient({
+            method:       'PUT',
+            resource:     '/' + bucket + '/' + key,
+            content:      content,
+            content_type: params.content_type,
+            meta:         params.meta,
+            acl:          params.acl,
+            load: function(req, obj) {
+                if (cb) cb(req);
+            },
+            error: function(req) {
+                if (err_cb) err_cb(req, obj);
+                if (cb) cb(req, obj);
+            }
+        });
+    },
+
+    /**
+        List buckets belonging to the account.
+    */
+    listBuckets: function(cb, err_cb) {
+        return this.httpClient({
+            method:   'GET',
+            resource: '/',
+            load: function(req, obj) {
+                if (cb) cb(req, obj);
+            },
+            error: function(req) {
+                if (err_cb) err_cb(req, obj);
+                if (cb) cb(req, obj);
+            }
+        })
+    },
+
+    /**
+        Given a bucket name and parameters, list keys in the bucket.
+    */
+    listKeys: function(bucket, params, cb, err_cb) {
+        return this.httpClient({
+            method:   'GET',
+            resource: '/' + bucket,
+            params:   params,
+            load: function(req, obj) {
+                if (cb) cb(req, obj);
+            },
+            error: function(req) {
+                if (err_cb) err_cb(req, obj);
+                if (cb) cb(req, obj);
+            }
+        });
+    },
+
+    /**
+        Delete a single key in a bucket.
+    */
+    deleteKey: function(bucket, key, cb, err_cb) {
+        this.httpClient({
+            method:   'DELETE',
+            resource: '/'+bucket+'/'+key,
+            load: function(req, obj) {
+                if (cb) return cb(req,obj);
+            },
+            error: function(req, obj) {
+                if (err_cb) return err_cb(req,obj);
+                if (cb) return cb(req,obj);
+            }
+        });
+    },
+
+    /**
+        Delete a list of keys in a bucket, with optional callbacks
+        for each deleted key and when list deletion is complete.
+    */
+    deleteKeys: function(bucket, list, one_cb, all_cb) {
+        var _this = this;
+        
+        // If the list is empty, then fire off the callback.
+        if (!list.length && all_cb) return all_cb();
+
+        // Fire off key deletion with a callback to delete the 
+        // next part of list.
+        var key = list.shift();
+        this.deleteKey(bucket, key, function() {
+            if (one_cb) one_cb(key);
+            _this.deleteKeys(bucket, list, one_cb, all_cb);
+        });
+    },
 
     /**
         Perform an authenticated S3 HTTP query.
@@ -113,7 +238,7 @@ S3Ajax = {
         req.onreadystatechange = function() {
             if (req.readyState == 4) {
 
-                // Parse the XML if needed.
+                // Pre-digest the XML if needed.
                 var obj = null;
                 if (req.responseXML && kwArgs.parseXML != false)
                     obj = _this.xmlToObj(req.responseXML);
@@ -140,6 +265,7 @@ S3Ajax = {
         JavaScript object.
 
         TODO: Handle attributes?
+        TODO: Force list for certain paths (ie. lists of one item)
     */
     xmlToObj: function(parent) {
         var obj = {};
@@ -176,7 +302,8 @@ S3Ajax = {
     */
     queryString: function(params) {
         var l = [];
-        for (k in params) l.push(k+'='+encodeURIComponent(params[k]))
+        for (k in params) 
+            l.push(k+'='+encodeURIComponent(params[k]))
         return l.join("&");
     },
 
@@ -217,7 +344,7 @@ S3Ajax = {
     /**
         Return a date formatted appropriately for HTTP Date header.
 
-        TODO: Rewrite to remove formatDate.js dependancy.
+        TODO: Rewrite to remove formatDate.js dependency?
         See: http://www.svendtofte.com/code/date_format/
     */
     httpDate: function(d) {

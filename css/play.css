@@ -2,6 +2,16 @@ body, td, p, div {
     font: 12px arial;
 }
 
+fieldset {
+    padding: 2ex;
+}
+legend {
+    font-weight: bold;
+    font-size: 1.25em;
+}
+
+#bucket_manage label, 
+#key_manage label, 
 #credentials label, 
 #xfers label {
     float: left;
@@ -9,6 +19,21 @@ body, td, p, div {
     text-align: right;
     margin-right: 1ex;
 }
+#bucket_manage label,
+#key_manage label {
+    width: 12ex;
+}
+
 #login, #download {
     margin-left: 16ex;
+}
+#bucket_manage select,
+#key_manage select {
+    width: 70%;
+    float: left;
+    padding-right: 1em;
+    font-size: 0.85em;
+}
+#content {
+    font-size: 0.85em;
 }

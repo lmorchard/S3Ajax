@@ -12,13 +12,14 @@ if (window.dojo) {
 Play = {
 
     /**
+        Initialize the play app.
     */
     init: function() {
         var _this = this;
 
         S3Ajax.DEBUG = true;
 
-        // HACK: Wait for the storage flash to become available, 
+        // HACK: Wait for the storage flash to become available 
         if (window.dojo) {
             this._storage_wait = setInterval(function() {
                 if ($('dojo-storeContainer')) {
@@ -31,13 +32,14 @@ Play = {
     },
     
     /**
+        Make an attempt to recall S3 credentials.
     */
     recall: function() {
         if (window.dojo && dojo.storage.get('key_id', '/S3Ajax')) {
             S3Ajax.KEY_ID     = dojo.storage.get('key_id',     '/S3Ajax');
             S3Ajax.SECRET_KEY = dojo.storage.get('secret_key', '/S3Ajax');
             $('key_id').value = S3Ajax.KEY_ID;
-            $('update_msg').innerHTML = 'Login fetched from local storage: '+(new Date());
+            $('update_msg').innerHTML = 'Credentials fetched from local storage: '+(new Date());
         }
     },
 
@@ -48,12 +50,12 @@ Play = {
         S3Ajax.KEY_ID     = $('key_id').value;
         S3Ajax.SECRET_KEY = $('secret_key').value;
 
+        // Try to stash the credentials away for next time.
         if (window.dojo) {
             dojo.storage.set('key_id',     S3Ajax.KEY_ID,     '/S3Ajax');
             dojo.storage.set('secret_key', S3Ajax.SECRET_KEY, '/S3Ajax');
         }
 
-        // Indicate success.
         $('update_msg').innerHTML = 'Last updated: '+(new Date());
     },
 
@@ -61,103 +63,176 @@ Play = {
         Download the specified resource.
     */
     download: function() {
-        var _this = this;
-        var resource = $('resource').value;
+        var bucket = $('list_bucket').value;
+        var key    = $('key').value;
 
-        var req = S3Ajax.httpClient({
-            method:   'GET',
-            resource: resource,
-            load: function(rv) {
-                $('content').value = rv.responseText;
+        $('content').value = "Loading...";
+
+        S3Ajax.get(bucket, key,
+            function(req, content) {
+                $('content').value = content;
                 $('xfer_msg').innerHTML = "Download succeeded at "+(new Date());
-                _this.lastRequest = rv;
             },
-            error: function(rv) {
+            function(req, objc) {
                 $('xfer_msg').innerHTML = "Download failed at "+(new Date());
-                _this.lastRequest = rv;
             }
-        });
-
+        );
     },
 
     /**
         Upload the specified resource.
     */
     upload: function() {
-        var _this = this;
-        var resource = $('resource').value;
+        var bucket   = $('list_bucket').value;
+        var key      = $('key').value;
         var content  = $('content').value;
 
-        var req = S3Ajax.httpClient({
-            method:       'PUT',
-            resource:     resource,
-            content_type: "text/plain",
-            content:      content,
-            meta:         {'posted-by':'S3Ajax'},
-            acl:          "public-read",
-            load:  function(rv) {
+        S3Ajax.put(bucket, key, content,
+            function(req) {
                 $('xfer_msg').innerHTML = "Upload succeeded at "+(new Date());
-                _this.lastRequest = rv;
             },
-            error: function(rv) {
+            function(req, obj) {
                 $('xfer_msg').innerHTML = "Upload failed at "+(new Date());
-                _this.lastRequest = rv;
             }
-        });
-    },
+        );
 
-
-    /**
-
-    */
-    list: function() {
-        var _this = this;
-        var resource = $('resource').value;
-
-        var req = S3Ajax.httpClient({
-            method:   'GET',
-            resource: resource,
-            /* params: {'prefix':'js', 'max-keys':10 }, */
-            load: function(req, obj) {
-                if (obj.ListBucketResult) {
-                    var out = '';
-                    var contents = obj.ListBucketResult.Contents;
-                    for (var i=0, item; item=contents[i]; i++) {
-                        out += item.LastModified + ' ' + item.Key + ' (' + item.Size + ')\n';
-                    }
-                    $('content').value = out;
-                }
+        /*
+        S3Ajax.put(bucket, key, content,
+            {
+                content_type: "text/plain",
+                meta:         {'posted-by':'S3Ajax'},
+                acl:          "public-read",
             },
-            error: function(req) {
-                $('xfer_msg').innerHTML = "Bucket list failed at "+(new Date());
+            function(req) {
+                $('xfer_msg').innerHTML = "Upload succeeded at "+(new Date());
+            },
+            function(req, obj) {
+                $('xfer_msg').innerHTML = "Upload failed at "+(new Date());
             }
-        });
-
+        );
+        */
     },
 
     /**
-
+        List available buckets
     */
     listbuckets: function() {
         var _this = this;
-        var req = S3Ajax.httpClient({
-            method:   'GET',
-            resource: '/',
-            load: function(req, obj) {
+
+        this.setList('buckets_list',['Loading...','']);
+
+        S3Ajax.listBuckets(
+            function(req, obj) {
+                _this.clearList('buckets_list');
                 if (obj.ListAllMyBucketsResult) {
-                    var out = '';
                     var buckets = obj.ListAllMyBucketsResult.Buckets.Bucket;
                     for (var i=0, bucket; bucket=buckets[i]; i++) {
-                        out += bucket.Name + ' ['+bucket.CreationDate+']\n';
+                        _this.addToList(
+                            'buckets_list',
+                            bucket.Name + ' ['+bucket.CreationDate+']',
+                            bucket.Name
+                        );
                     }
-                    $('content').value = out;
+                }
+                keys_list = null;
+            },
+            function(req) {
+                _this.setList('buckets_list', ["Buckets list failed at "+(new Date()),'']);
+            }
+        );
+
+    },
+
+    /**
+        Change the current bucket to one selected in list.
+    */
+    selectbucket: function() {
+        var sel = this.getSelected('buckets_list');
+        if (sel.length) $('list_bucket').value = sel[0]; 
+    },
+
+    /**
+        List a bucket's contents.
+    */
+    list: function() {
+        var _this = this;
+        this.setList('keys_list', ['Loading...','']);
+
+        var bucket = $('list_bucket').value;
+
+        var params = {};
+        if ($('list_prefix').value)  params['prefix']   = $('list_prefix').value;
+        if ($('list_maxkeys').value) params['max-keys'] = $('list_maxkeys').value;
+        if ($('list_marker').value)  params['marker']   = $('list_marker').value;
+
+        S3Ajax.listKeys(bucket, params, 
+            function(req, obj) {
+                _this.clearList('keys_list');
+                var contents = obj.ListBucketResult.Contents;
+                for (var i=0, item; item=contents[i]; i++) {
+                    _this.addToList(
+                        'keys_list',
+                        /*item.LastModified + ' ' +*/ item.Key + ' (' + item.Size + ')',
+                        item.Key
+                    );
                 }
             },
-            error: function(req) {
-                $('xfer_msg').innerHTML = "Buckets list failed at "+(new Date());
+            function(req, obj) {
+                _this.setList('keys_list', ["Keys list failed at "+(new Date()),'']);
             }
-        });
+        );
+    },
 
+    /**
+        Download the selected key.
+    */
+    downloadSelectedKey: function() {
+        var sel = this.getSelected('keys_list');
+        if (sel.length) {
+            $('key').value = sel[0]; 
+            this.download();
+        }
+    },
+
+    /**
+        Delete seleted keys.
+    */
+    deleteSelectedKeys: function() {
+        var _this = this;
+        var sel_keys = this.getSelected('keys_list');
+
+        if (!window.confirm("Delete " + sel_keys.length + " selected items?")) return;
+
+        S3Ajax.deleteKeys($('list_bucket').value, sel_keys, 
+            function(key)      { logFire("Deleted "+key); },
+            function(req, obj) { logFire("Deleted all"); }
+        );
+    },
+
+    clearList: function(lid) {
+        $(lid).options.length = 0;
+    },
+
+    addToList: function(lid, label, key) {
+        var list = $(lid);
+        list.options[list.options.length] = new Option(label, key);
+    },
+
+    setList: function(lid, items) {
+        var list = $(lid);
+        this.clearList(lid);
+        for(i=0;i<items.length;i+=2) {
+            list.options[i/2] = new Option(items[i],items[i+1]);
+        }
+    },
+
+    getSelected: function(lid) {
+        var sel = [];
+        var options = $(lid).options;
+        for (var i=0, item; item=options[i]; i++) {
+            if (item.selected) sel.push(item.value);
+        }
+        return sel;
     },
 
     /* Help protect against errant end-commas */
