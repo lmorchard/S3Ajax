@@ -1,12 +1,21 @@
 <html>
     <head>
         <title>S3Ajax Play</title>
-        <link href="css/play.css" rel="stylesheet" type="text/css" />
+
+        <!--
+        <script src="js/config.js" type="text/javascript"></script>
         <script src="js/MochiKit/MochiKit.js" type="text/javascript"></script>
+        <script src="js/dojo.js" type="text/javascript"></script>
+        <script type="text/javascript"
+                src="http://o.aolcdn.com/iamalpha/.resource/jssdk/dojo-0.2.2/dojo.js"></script>
+        <script src="js/md5.js" type="text/javascript"></script>
+        -->
         <script src="js/sha1.js" type="text/javascript"></script>
         <script src="js/formatDate.js" type="text/javascript"></script>
         <script src="js/S3Ajax.js" type="text/javascript"></script>
         <script src="js/play.js" type="text/javascript"></script>
+
+        <link href="css/play.css" rel="stylesheet" type="text/css" />
     </head>
     <body>
         <h1>S3Ajax Play</h1>
@@ -19,11 +28,11 @@
             <input type="text" size="50" id="key_id" name="key_id" /><br />
             
             <label for="secret_key">SecretAccessKey</label>
-            <input type="text" size="50" id="secret_key" name="secret_key" /><br />
+            <input type="password" size="50" id="secret_key" name="secret_key" /><br />
 
-            <button id="login" onClick="Play.login(this); return false">
-                Update credentials
-            </button>
+            <button id="login" onClick="Play.login(this); return false"> Store </button>
+            <button id="recall" onClick="Play.recall(this); return false"> Recall </button>
+            
             <span id="update_msg"></span>
 
         </form>
@@ -33,17 +42,16 @@
         <form id="xfers" onSubmit="Play.download(this); return false;">
 
             <label for="resource">Resource</label>
-            <input type="text" size="50" id="resource" name="resource" value="/test" /><br />
+            <input type="text" size="50" id="resource" name="resource" value="/decafbad/" /><br />
 
             <label for="content">Content</label>
-            <textarea id="content" name="content" cols="70" rows="10"></textarea><br />
+            <textarea id="content" name="content" cols="70" rows="20"></textarea><br />
 
-            <button id="download" onClick="Play.download(this); return false">
-                Download
-            </button>
-            <button id="upload" onClick="Play.upload(this); return false">
-                Upload
-            </button>
+            <button id="download" onClick="Play.download(this); return false"> Download </button>
+            <button id="upload" onClick="Play.upload(this); return false"> Upload </button>
+            <button id="listbuckets" onClick="Play.listbuckets(this); return false"> List Buckets </button>
+            <button id="list" onClick="Play.list(this); return false"> List </button>
+
             <span id="xfer_msg"></span>
 
         </form>
