@@ -1,0 +1,30 @@
+<html>
+    <head>
+        <title>StartPage</title>
+        <script src="../js/common.js" type="text/javascript"></script>
+        <script src="../js/firebug.js" type="text/javascript"></script>
+        <script src="../js/dojo.js" type="text/javascript"></script>
+        <script src="../js/sha1.js" type="text/javascript"></script>
+        <script src="../js/S3Ajax.js" type="text/javascript"></script>
+        <script src="../js/wiky.js" type="text/javascript"></script>
+        <script src="../js/wiky.s3wiki.js" type="text/javascript"></script>
+        <script src="../js/wiki.js" type="text/javascript"></script>
+        <link href="../css/wiki.css" type="text/css" rel="stylesheet"/>
+    </head>
+    <body>
+        <h1 id="page_title">StartPage</h1>
+        <div id="content">
+            <p>Welcome to S3Wiki.  This is the default page content.</p>
+            <p>You might try creating a <a class="wikiword" href="NewPage">NewPage</a>, or editing this one.</p>
+            <ul>
+                <li><a class="wikiword" href="GreatGoogly">GreatGoogly</a></li>
+                <li><a class="wikiword" href="PageOne">PageOne</a></li>
+                <li><a class="wikiword" href="PageTwo">PageTwo</a></li>
+                <li><a class="wikiword" href="TestTest">TestTest</a></li>
+                <li><a class="wikiword" href="PageOne">PageOne</a></li>
+                <li><a class="wikiword" href="PageOne">PageOne</a></li>
+                <li><a class="wikiword" href="PageNewWheee">PageNewWheee</a></li>
+            </ul>
+        </div>
+    </body>
+</html>

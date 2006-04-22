@@ -1,5 +1,7 @@
 /**
     Play around with S3Ajax!
+
+    TODO: Remove Dojo dependency
 */
 
 if (window.dojo) {
@@ -19,7 +21,8 @@ Play = {
 
         S3Ajax.DEBUG = true;
 
-        // HACK: Wait for the storage flash to become available 
+        // HACK: Wait for the storage flash to become available.
+        // TODO: Look for an official Dojo event to make this happen.
         if (window.dojo) {
             this._storage_wait = setInterval(function() {
                 if ($('dojo-storeContainer')) {
@@ -122,15 +125,15 @@ Play = {
     listbuckets: function() {
         var _this = this;
 
-        this.setList('buckets_list',['Loading...','']);
+        setList('buckets_list',['Loading...','']);
 
         S3Ajax.listBuckets(
             function(req, obj) {
-                _this.clearList('buckets_list');
+                clearList('buckets_list');
                 if (obj.ListAllMyBucketsResult) {
                     var buckets = obj.ListAllMyBucketsResult.Buckets.Bucket;
                     for (var i=0, bucket; bucket=buckets[i]; i++) {
-                        _this.addToList(
+                        addToList(
                             'buckets_list',
                             bucket.Name + ' ['+bucket.CreationDate+']',
                             bucket.Name
@@ -140,7 +143,7 @@ Play = {
                 keys_list = null;
             },
             function(req) {
-                _this.setList('buckets_list', ["Buckets list failed at "+(new Date()),'']);
+                setList('buckets_list', ["Buckets list failed at "+(new Date()),'']);
             }
         );
 
@@ -150,7 +153,7 @@ Play = {
         Change the current bucket to one selected in list.
     */
     selectbucket: function() {
-        var sel = this.getSelected('buckets_list');
+        var sel = getSelected('buckets_list');
         if (sel.length) $('list_bucket').value = sel[0]; 
     },
 
@@ -158,10 +161,10 @@ Play = {
     */
     deletebucket: function() {
         var _this = this;
-        var sel = this.getSelected('buckets_list');
+        var sel = getSelected('buckets_list');
         if (!sel.length) return;
 
-        this.setList('buckets_list',['Deleting...','']);
+        setList('buckets_list',['Deleting...','']);
         S3Ajax.deleteBucket(sel[0], function() {
             _this.listbuckets();
         });
@@ -173,7 +176,7 @@ Play = {
         var _this = this;
         var bucket = $('list_bucket').value;
 
-        this.setList('buckets_list',['Creating...','']);
+        setList('buckets_list',['Creating...','']);
         S3Ajax.createBucket(bucket, function() {
             _this.listbuckets();
         });
@@ -184,7 +187,7 @@ Play = {
     */
     list: function() {
         var _this = this;
-        this.setList('keys_list', ['Loading...','']);
+        setList('keys_list', ['Loading...','']);
 
         var bucket = $('list_bucket').value;
 
@@ -195,10 +198,10 @@ Play = {
 
         S3Ajax.listKeys(bucket, params, 
             function(req, obj) {
-                _this.clearList('keys_list');
+                clearList('keys_list');
                 var contents = obj.ListBucketResult.Contents;
                 for (var i=0, item; item=contents[i]; i++) {
-                    _this.addToList(
+                    addToList(
                         'keys_list',
                         /*item.LastModified + ' ' +*/ item.Key + ' (' + item.Size + ')',
                         item.Key
@@ -206,7 +209,7 @@ Play = {
                 }
             },
             function(req, obj) {
-                _this.setList('keys_list', ["Keys list failed at "+(new Date()),'']);
+                setList('keys_list', ["Keys list failed at "+(new Date()),'']);
             }
         );
     },
@@ -215,7 +218,7 @@ Play = {
         Download the selected key.
     */
     downloadSelectedKey: function() {
-        var sel = this.getSelected('keys_list');
+        var sel = getSelected('keys_list');
         if (sel.length) {
             $('key').value = sel[0]; 
             this.download();
@@ -227,97 +230,17 @@ Play = {
     */
     deleteSelectedKeys: function() {
         var _this = this;
-        var sel_keys = this.getSelected('keys_list');
+        var sel_keys = getSelected('keys_list');
 
         if (!window.confirm("Delete " + sel_keys.length + " selected items?")) return;
 
         S3Ajax.deleteKeys($('list_bucket').value, sel_keys, 
-            function(key)      { logFire("Deleted "+key); },
-            function(req, obj) { logFire("Deleted all"); _this.list(); }
+            function(key)      { /*logFire("Deleted "+key);*/ },
+            function(req, obj) { /*logFire("Deleted all");*/ _this.list(); }
         );
-    },
-
-    clearList: function(lid) {
-        $(lid).options.length = 0;
-    },
-
-    addToList: function(lid, label, key) {
-        var list = $(lid);
-        list.options[list.options.length] = new Option(label, key);
-    },
-
-    setList: function(lid, items) {
-        var list = $(lid);
-        this.clearList(lid);
-        for(i=0;i<items.length;i+=2) {
-            list.options[i/2] = new Option(items[i],items[i+1]);
-        }
-    },
-
-    getSelected: function(lid) {
-        var sel = [];
-        var options = $(lid).options;
-        for (var i=0, item; item=options[i]; i++) {
-            if (item.selected) sel.push(item.value);
-        }
-        return sel;
     },
 
     /* Help protect against errant end-commas */
     EOF: null
 }
-
-if (!window['addLoadEvent']) {
-    function addLoadEvent(func) {
-        var oldonload = window.onload;
-        if (typeof window.onload != 'function') {
-            window.onload = func;
-        } else {
-            window.onload = function() {
-                oldonload();
-                func();
-            }
-        }
-    }
-}
-if (!window['$']) {
-    function $(id) { return document.getElementById(id); }
-}
-
 addLoadEvent(function(){ Play.init() });
-
-/*************************************************************************/
-/* Janky logging crud follows.                                           */
-/*************************************************************************/
-
-useFireBug = true;
-
-printfire = function() { 
-    printfire.args = arguments; 
-    // Opera8 does not support dispatchEvent() 
-    // as global method (not required by W3C). 
-    // This helps to sort it out. 
-    try { 
-        if (!useFireBug) { 
-            // Mozilla installations without FireBug extension 
-            throw 'useAlertFunction'; 
-        } 
-        var ev = document.createEvent("Events"); 
-        ev.initEvent("printfire", false, true); 
-        // FireBug needs dispatchEvent() to be global 
-        // otherwise it fails 
-        dispatchEvent(ev); 
-    } catch (noConsole) { 
-        alert(arguments[0]); 
-    } 
-} 
-logFire = function() { 
-    if (window.printfire) { 
-        printfire( arguments[0], arguments[1]); 
-    } 
-}
-if (window['logger'] && logger.addListener) {
-    logger.addListener('firebug', null, function (msg) { 
-        printfire(msg.level + sum(map(function (i) { return ', ' + i; }, msg.info))); 
-    });
-}

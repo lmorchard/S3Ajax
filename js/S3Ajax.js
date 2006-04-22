@@ -7,15 +7,11 @@
 
     Requires:
         http://pajhome.org.uk/crypt/md5/sha1.js
-        http://www.svendtofte.com/code/date_format/formatDate.js
 */
 
-// TODO: Figure out if Safari doesn't support PUT and Delete
+// TODO: Figure out if Safari doesn't support PUT and DELETE
 
 S3Ajax = {
-
-    // Flip this to true to get lots of wonky logging.
-    DEBUG: false,
 
     // Defeat caching with query params on GET requests?
     DEFEAT_CACHE: false,
@@ -42,6 +38,9 @@ S3Ajax = {
     KEY_ID:     '',
     SECRET_KEY: '',
 
+    // Flip this to true to potentially get lots of wonky logging.
+    DEBUG: false,
+
     /**
         Get contents of a key in a bucket.
     */
@@ -50,11 +49,28 @@ S3Ajax = {
             method:   'GET',
             resource: '/' + bucket + '/' + key,
             load: function(req, obj) {
-                if (cb) cb(req, req.responseText);
+                if (cb)     return cb(req, req.responseText);
             },
-            error: function(req) {
-                if (err_cb) err_cb(req, obj);
-                if (cb) cb(req, req.responseText);
+            error: function(req, obj) {
+                if (err_cb) return err_cb(req, obj);
+                if (cb)     return cb(req, req.responseText);
+            }
+        })
+    },
+
+    /**
+        Head the meta of a key in a bucket.
+    */
+    head: function(bucket, key, cb, err_cb) {
+        return this.httpClient({
+            method:   'HEAD',
+            resource: '/' + bucket + '/' + key,
+            load: function(req, obj) {
+                if (cb)     return cb(req, req.responseText);
+            },
+            error: function(req, obj) {
+                if (err_cb) return err_cb(req, obj);
+                if (cb)     return cb(req, req.responseText);
             }
         })
     },
@@ -85,11 +101,11 @@ S3Ajax = {
             meta:         params.meta,
             acl:          params.acl,
             load: function(req, obj) {
-                if (cb) cb(req);
+                if (cb)     return cb(req);
             },
-            error: function(req) {
-                if (err_cb) err_cb(req, obj);
-                if (cb) cb(req, obj);
+            error: function(req, obj) {
+                if (err_cb) return err_cb(req, obj);
+                if (cb)     return cb(req, obj);
             }
         });
     },
@@ -169,13 +185,13 @@ S3Ajax = {
         var _this = this;
         
         // If need to defeat cache, toss in a date param on GET.
-        if (this.DEFEAT_CACHE && kwArgs.method == "GET") {
+        if (this.DEFEAT_CACHE && ( kwArgs.method == "GET" || kwArgs.method == "HEAD" ) ) {
             if (!kwArgs.params) kwArgs.params = {};
             kwArgs.params["___"] = new Date().getTime();
         }
 
         // Prepare the query string and URL for this request.
-        var qs   = (kwArgs.params) ? '?'+this.queryString(kwArgs.params) : '';
+        var qs   = (kwArgs.params) ? '?'+queryString(kwArgs.params) : '';
         var url  = this.URL + kwArgs.resource + qs;
         var hdrs = {};
 
@@ -216,21 +232,26 @@ S3Ajax = {
             }
         }
 
-        // Build the string to sign for authentication.
-        var s = kwArgs.method + "\n";
-        s = s + content_MD5 + "\n";
-        s = s + kwArgs.content_type + "\n";
-        s = s + http_date + "\n";
-        s = s + acl_header_to_sign;
-        s = s + meta_to_sign;
-        s = s + kwArgs.resource;
+        // Only perform authentication if non-anonymous and credentials available
+        if (kwArgs['anonymous'] != true && this.KEY_ID && this.SECRET_KEY) {
 
-        // Sign the string with our SECRET_KEY.
-        var signature = this.hmacSHA1(s, this.SECRET_KEY);
-        hdrs['Authorization'] = "AWS "+this.KEY_ID+":"+signature;
+            // Build the string to sign for authentication.
+            var s; 
+            s  = kwArgs.method + "\n";
+            s += content_MD5 + "\n";
+            s += kwArgs.content_type + "\n";
+            s += http_date + "\n";
+            s += acl_header_to_sign;
+            s += meta_to_sign;
+            s += kwArgs.resource;
+
+            // Sign the string with our SECRET_KEY.
+            var signature = this.hmacSHA1(s, this.SECRET_KEY);
+            hdrs['Authorization'] = "AWS "+this.KEY_ID+":"+signature;
+        }
 
         // Perform the HTTP request.
-        var req = this.getXMLHttpRequest();
+        var req = getXMLHttpRequest();
         req.open(kwArgs.method, url, true);
         for (var k in hdrs) req.setRequestHeader(k, hdrs[k]);
         req.onreadystatechange = function() {
@@ -248,10 +269,11 @@ S3Ajax = {
                 }
                 
                 // Dispatch to appropriate handler callback
-                if (req.status >= 400 && kwArgs.error)
+                if ( (req.status >= 400 || (obj && obj.Error) ) && kwArgs.error)
                     return kwArgs.error(req, obj);
                 else
                     return kwArgs.load(req, obj);
+
             }
         }
         req.send(kwArgs.content);
@@ -303,19 +325,84 @@ S3Ajax = {
     },
 
     /**
-        Wrap object-to-query-string encoding.
+        Abstract HMAC SHA1 signature calculation.
     */
-    queryString: function(params) {
+    hmacSHA1: function(data, secret) {
+        // TODO: Alternate Dojo implementation?
+        return b64_hmac_sha1(secret, data)+'=';
+    },
+    
+    /**
+        Return a date formatted appropriately for HTTP Date header.
+        Inspired by: http://www.svendtofte.com/code/date_format/
+
+        TODO: Should some/all of this go into common.js?
+    */
+    httpDate: function(d) {
+        // Use now as default date/time.
+        if (!d) d = new Date();
+
+        // Date abbreviations.
+        var daysShort   = ["Sun", "Mon", "Tue", "Wed",
+                           "Thu", "Fri", "Sat"];
+        var monthsShort = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+                           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+        // See: http://www.quirksmode.org/js/introdate.html#sol
+        function takeYear(theDate) {
+            var x = theDate.getYear();
+            var y = x % 100;
+            y += (y < 38) ? 2000 : 1900;
+            return y;
+        };
+
+        // Number padding function
+        function zeropad(num, sz) { 
+            return ( (sz - (""+num).length) > 0 ) ? 
+                arguments.callee("0"+num, sz) : num; 
+        };
+        
+        function gmtTZ(d) {
+            // Difference to Greenwich time (GMT) in hours
+            var os = Math.abs(d.getTimezoneOffset());
+            var h = ""+Math.floor(os/60);
+            var m = ""+(os%60);
+            h.length == 1? h = "0"+h:1;
+            m.length == 1? m = "0"+m:1;
+            return d.getTimezoneOffset() < 0 ? "+"+h+m : "-"+h+m;
+        };
+
+        var s;
+        s  = daysShort[d.getDay()] + ", ";
+        s += d.getDate() + " ";
+        s += monthsShort[d.getMonth()] + " ";
+        s += takeYear(d) + " ";
+        s += zeropad(d.getHours(), 2) + ":";
+        s += zeropad(d.getMinutes(), 2) + ":";
+        s += zeropad(d.getSeconds(), 2) + " ";
+        s += gmtTZ(d);
+
+        return s;
+    },
+
+    /* Help protect against errant end-commas */
+    EOF: null
+
+};
+
+if (!window['queryString']) {
+    // Swiped from MochiKit
+    function queryString(params) {
         var l = [];
         for (k in params) 
             l.push(k+'='+encodeURIComponent(params[k]))
         return l.join("&");
-    },
+    }
+}
 
-    /**
-        Shamelessly swiped from MochiKit/Async.js
-    */
-    getXMLHttpRequest: function() {
+if (!window['getXMLHttpRequest']) {
+    // Shamelessly swiped from MochiKit/Async.js
+    function getXMLHttpRequest() {
         var self = arguments.callee;
         if (!self.XMLHttpRequest) {
             var tryThese = [
@@ -336,29 +423,6 @@ S3Ajax = {
             }
         }
         return self.XMLHttpRequest();
-    },
-
-    /**
-        Abstract HMAC SHA1 signature calculation.
-    */
-    hmacSHA1: function(data, secret) {
-        // TODO: Alternate Dojo implementation
-        return b64_hmac_sha1(secret, data)+'=';
-    },
-    
-    /**
-        Return a date formatted appropriately for HTTP Date header.
-
-        TODO: Rewrite to remove formatDate.js dependency?
-        See: http://www.svendtofte.com/code/date_format/
-    */
-    httpDate: function(d) {
-        if (!d) d = new Date();
-        return d.formatDate("r");
-    },
-
-    /* Help protect against errant end-commas */
-    EOF: null
-
-};
+    }
+}
 
