@@ -56,7 +56,7 @@ S3AjaxWiki = {
         S3Ajax.DEBUG = this.DEBUG;
         S3Ajax.DEFEAT_CACHE = true;
 
-        forEach([ 'FIELDSET', 'SCRIPT' ], function(n) { 
+        forEach([ 'FIELDSET' ], function(n) { 
             window[n] = createDOMFunc(n); 
         });
 
