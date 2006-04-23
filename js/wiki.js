@@ -30,6 +30,7 @@ S3AjaxWiki = {
 
     DEBUG:        true,
 
+    ANONYMOUS:    false,
     BUCKET:       'decafbad',
     TEMPLATE_KEY: 'wiki-template.html',
     KEY_PREFIX:   'wiki/',
@@ -73,7 +74,8 @@ S3AjaxWiki = {
         });
 
         this.injectEditingFramework();
-        this.autoLoadCredentials();
+        if (!this.ANONYMOUS) this.autoLoadCredentials();
+        else this.onLogin();
     },
 
     /**
@@ -513,27 +515,28 @@ S3AjaxWiki = {
             ),
 
             // Build the login credentials form.
-            FORM({"id":"credentials", "onsubmit":"S3AjaxWiki.login(); return false;"}, 
-                DIV({"id":"cals_status"}, 
-                    SPAN({"id":"credentials_msg"}),
-                    " ",
-                    A({"href":"#", "onclick":"S3AjaxWiki.showCredentials(); return false"}, "Login.")
+            (this.ANONYMOUS) ? '' : 
+                FORM({"id":"credentials", "onsubmit":"S3AjaxWiki.login(); return false;"}, 
+                    DIV({"id":"cals_status"}, 
+                        SPAN({"id":"credentials_msg"}),
+                        " ",
+                        A({"href":"#", "onclick":"S3AjaxWiki.showCredentials(); return false"}, "Login.")
+                    ),
+                    FIELDSET({"id":"credentials_fields"}, 
+
+                        LEGEND({}, "Credentials"),
+
+                        LABEL({"for":"key_id"}, "AWSAccessKey"), BR(),
+                        INPUT({"type":"text", "size":"25", "id":"key_id", "name":"key_id"}), BR(),
+                        
+                        LABEL({"for":"secret_key"}, "SecretAccessKey"), BR(),
+                        INPUT({"type":"password", "size":"25", "id":"secret_key", "name":"secret_key"}), BR(),
+
+                        BUTTON({"id":"store", "onclick":"S3AjaxWiki.login(); return false"}, " Store "),
+                        BUTTON({"id":"recall", "onclick":"S3AjaxWiki.recall(); return false"}, " Recall "),
+                        BUTTON({"id":"cancel", "onclick":"S3AjaxWiki.hideCredentials(); return false"}, " Cancel ")
+                    )
                 ),
-                FIELDSET({"id":"credentials_fields"}, 
-
-                    LEGEND({}, "Credentials"),
-
-                    LABEL({"for":"key_id"}, "AWSAccessKey"), BR(),
-                    INPUT({"type":"text", "size":"25", "id":"key_id", "name":"key_id"}), BR(),
-                    
-                    LABEL({"for":"secret_key"}, "SecretAccessKey"), BR(),
-                    INPUT({"type":"password", "size":"25", "id":"secret_key", "name":"secret_key"}), BR(),
-
-                    BUTTON({"id":"store", "onclick":"S3AjaxWiki.login(); return false"}, " Store "),
-                    BUTTON({"id":"recall", "onclick":"S3AjaxWiki.recall(); return false"}, " Recall "),
-                    BUTTON({"id":"cancel", "onclick":"S3AjaxWiki.hideCredentials(); return false"}, " Cancel ")
-                )
-            ),
 
             // Build the page list box.
             FORM({'id':'toc', 'onsubmit':'return false'},
