@@ -537,6 +537,7 @@ S3AjaxWiki = {
 
             // Build the page list box.
             FORM({'id':'toc', 'onsubmit':'return false'},
+                SPAN("Recent Changes"),
                 SELECT({'id':'page_list', 'name':'page_list', 'onchange':'S3AjaxWiki.selectPage(); return false'}),
                 BUTTON({'id':'get_pages',  'onclick':'S3AjaxWiki.selectPage(); return false'}, 'Go' ),
                 BUTTON({'id':'list_pages', 'onclick':'S3AjaxWiki.refreshPageList(); return false'}, 'Refresh' )
