@@ -35,14 +35,26 @@ S3AjaxWiki = {
     KEY_PREFIX:   'wiki/',
     DEFAULT_ACL:  'public-read',
     DEFAULT_TYPE: 'text/html',
+    DEFAULT_META: {'posted-by':'S3AjaxWiki'},
     
     /*
         These are the IDs of elements injected as a part of the wiki
         editing framework, and should not end up in serialized pages.
     */
-    INJECTED_IDS: [
+    IGNORED_ELEMENT_IDS: [
         'content_edit', 'credentials', 'toc', 'page_options', 
         'xfer_msg', 'dojo-storeContainer'
+    ],
+
+    /*
+        These are attribute names that cause problems in MSIE.
+        We'll ignore them during page serialization.
+        TODO: Make this a per-element hash?  Need more sophistication here.
+    */
+    IGNORED_ATTRIBUTE_NAMES: [
+        'hideFocus', 'contentEditable', 'disabled', 'tabIndex',
+        'bottomMargin', 'noWrap', 'leftMargin', 'topMargin', 
+        'rightMargin', 'defer'
     ],
 
     /**
@@ -194,6 +206,9 @@ S3AjaxWiki = {
         TODO: Simply redirect if the page already exists?
     */
     createNewPage: function(word) {
+        // Do not create unnamed pages.
+        if (!word) return;
+
         var _this = this;
         S3Ajax.get(_this.BUCKET, _this.TEMPLATE_KEY,
             function(req, data) {
@@ -215,14 +230,14 @@ S3AjaxWiki = {
                         h1.firstChild.nodeValue = word;
 
                 // Get serialized HTML content from the page DOM
-                var content = _this.fromDOMtoHTML(xml);
+                var data = _this.fromDOMtoHTML(xml);
 
                 // Upload to S3, redirect if successful.
-                S3Ajax.put(_this.BUCKET, _this.KEY_PREFIX + word, content,
+                S3Ajax.put(_this.BUCKET, _this.KEY_PREFIX + word, data,
                     {
                         content_type: _this.DEFAULT_TYPE,
                         acl:          _this.DEFAULT_ACL,
-                        meta:         {'posted-by':'S3AjaxWiki'}
+                        meta:         _this.DEFAULT_META
                     },
                     function(req) {
                         location.href = word;
@@ -249,7 +264,15 @@ S3AjaxWiki = {
             this.BUCKET, { prefix:this.KEY_PREFIX }, 
             function(req, obj) {
                 clearList('page_list');
+
+                // Sort in reverse-chronological change order.
                 var contents = obj.ListBucketResult.Contents;
+                contents.sort(function(a,b) {
+                    if (b.LastModified > a.LastModified) return 1;
+                    if (b.LastModified < a.LastModified) return -1;
+                    return 0;
+                });
+
                 for (var i=0, item; item=contents[i]; i++) {
                     var key   = item.Key;
                     var title = key.substr(_this.KEY_PREFIX.length) 
@@ -277,25 +300,6 @@ S3AjaxWiki = {
             key.substr(_this.KEY_PREFIX.length) : key;
 
         location.href = title;
-
-        /*
-        $('page_title').innerHTML = title;
-
-        $('content').innerHTML = "Loading...";
-
-        S3Ajax.get(this.BUCKET, key,
-            function(req, content) {
-                $('content').innerHTML = content;
-                $('editor').value = Wiky.toWiki(content);
-            },
-            function(req, objc) {
-                $('content').innerHTML = "Download failed at "+(new Date());
-                _this.showEditor();
-                // TODO: Do something sensible here to create a new page?
-            }
-        );
-        */
-
     },
 
     /**
@@ -407,7 +411,9 @@ S3AjaxWiki = {
     /**
         Serialize a given DOM to HTML source.  If no node given, assume 
         the current page should be serialized.  Note that this makes efforts
-        using INJECTED_IDS to avoid including the injected editor framework.
+        using IGNORED_ELEMENT_IDS to avoid including the injected editor framework.
+
+        TODO: Steal more ideas from MochiKit.DOM.emitHTML()
     */
     fromDOMtoHTML: function(node) {
 
@@ -425,40 +431,62 @@ S3AjaxWiki = {
             case Node.ELEMENT_NODE:
                 var node_name = node.nodeName.toLowerCase();
 
+                // Skip elements with ignored IDs
+                for (var j=0, skip_id; skip_id=this.IGNORED_ELEMENT_IDS[j]; j++) {
+                    if (skip_id == node.id) { return ''; }
+                }
+
+                // HACK: Firefox kept dropping in Firebug stylesheets
+                if ('link'==node_name && /chrome:/.test(node.getAttribute('href')))
+                    return '';
+
                 // Start serializing the current node.
                 var out = '<' + node_name;
 
                 // Serialize the attributes of the node.
                 for (var i=0, attr; attr=node.attributes[i]; i++) {
                     var name  = attr.name;
+
+                    // Skip ignored attributes
+                    var skip = false;
+                    for (var j=0, skip_name; skip_name=this.IGNORED_ATTRIBUTE_NAMES[j]; j++) {
+                        if (skip_name == name) { skip=true; break; }
+                    }
+                    if (skip) continue;
+                    
                     var value = attr.value;
-                    if (value) out += ' '+name+'="'+value+'"';
+                    if (value && value!=null && value!="null")
+                        out += ' '+name+'="'+value+'"';
                 }
 
                 // Serialize all child nodes found.
                 var sub_out = '';
-                for (var i=0, child; child=node.childNodes[i]; i++) {
-                    
-                    // Do not serialize nodes injected by editor.
-                    var skip = false;
-                    for (var j=0, skip_id; skip_id=this.INJECTED_IDS[j]; j++) {
-                        if (skip_id == child.id) { skip=true; break; }
-                    }
 
-                    // Serialize the child node if not skipping.
-                    if (!skip) sub_out += this.fromDOMtoHTML(child);
-                
+                if ( ('script'==node_name || 'title'==node_name) && node.innerHTML) {
+                    // HACK: MSIE gives me troubles in scooping out these tags contents.
+                    sub_out = ''+node.innerHTML;
+                } else {
+                    for (var i=0, child; child=node.childNodes[i]; i++) {
+                        sub_out += this.fromDOMtoHTML(child);
+                    }
                 }
 
                 // Finalize the current node.
-                // HACK: Script tags cannot be empty, for MSIE
-                if (sub_out || 'script'==node_name)
+                if (sub_out || 'script'==node_name || 'title'==node_name)
                     return out + '>' + sub_out + '</' + node_name + '>';
                 else 
                     return out + '/>';
 
             default:
                 return '';
+                /*
+                // TODO: Err...  Is this even what I should be doing here?
+                try {
+                    return node.parentNode.innerHTML;
+                } catch (e) {
+                    return '';
+                }
+                */
         }
     
     },
@@ -475,11 +503,11 @@ S3AjaxWiki = {
 
             // Build the content editing form.
             FORM({"id":"content_edit", "onsubmit":"return false"},
-                TEXTAREA({"id":"editor", "name":"editor", "cols":"80", "rows":"30"}),
+                TEXTAREA({"id":"editor", "name":"editor", "cols":"80", "rows":"20"}),
                 BR(),
                 FIELDSET({},
                     BUTTON({"id":"preview", "onclick":"S3AjaxWiki.previewPage(); return false"}, "Preview Changes"),
-                    BUTTON({"id":"submit",  "onclick":"S3AjaxWiki.updatePage();  return false"}, "Submit Changes"),
+                    BUTTON({"id":"submit",  "onclick":"S3AjaxWiki.updatePage();  return false"}, "Save Changes"),
                     BUTTON({"id":"cancel",  "onclick":"S3AjaxWiki.cancelEdit();  return false"}, "Cancel")
                 )
             ),
@@ -510,16 +538,16 @@ S3AjaxWiki = {
             // Build the page list box.
             FORM({'id':'toc', 'onsubmit':'return false'},
                 SELECT({'id':'page_list', 'name':'page_list', 'onchange':'S3AjaxWiki.selectPage(); return false'}),
-                BUTTON({'id':'list_pages', 'onclick':'S3AjaxWiki.refreshPageList(); return false'}, 'Refresh' ),
-                BUTTON({'id':'get_pages',  'onclick':'S3AjaxWiki.selectPage(); return false'}, 'Get' )
+                BUTTON({'id':'get_pages',  'onclick':'S3AjaxWiki.selectPage(); return false'}, 'Go' ),
+                BUTTON({'id':'list_pages', 'onclick':'S3AjaxWiki.refreshPageList(); return false'}, 'Refresh' )
             ),
 
             // Set up the page options div
             FORM({'id':'page_options', 'onsubmit':'return false'},
-                BUTTON({'onclick':'S3AjaxWiki.editPage(); return false;'}, "Edit this Page"),
+                BUTTON({'onclick':'S3AjaxWiki.editPage(); return false;'}, "Edit Page"),
                 " | ",
-                INPUT({'type':'text', 'size':'15', 'id':'new_page_name', 'name':'new_page_name'}),
-                BUTTON({'onclick':'S3AjaxWiki.createNewPage($("new_page_name").value); return false;'}, "Create New Page")
+                INPUT({'type':'text', 'size':'15', 'id':'new_page_name', 'name':'new_page_name', 'value':'NewPage'}),
+                BUTTON({'onclick':'S3AjaxWiki.createNewPage($("new_page_name").value); return false;'}, "Create Page")
             ),
 
             // Inject the xfer message div.
