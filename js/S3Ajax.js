@@ -205,7 +205,7 @@ S3Ajax = {
 
         // Set the timestamp for this request.
         var http_date = this.httpDate();
-        hdrs['Date']  = http_date;
+        hdrs['x-amz-date']  = http_date;
 
         var content_MD5 = '';
         /*
