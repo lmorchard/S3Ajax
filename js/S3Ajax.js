@@ -30,7 +30,9 @@ S3Ajax.prototype = {
         // Default ACL to use when uploading keys.
         default_acl: 'public-read',
         // Default content-type to use in uploading keys.
-        default_content_type: 'text/plain; charset=UTF-8'
+        default_content_type: 'text/plain; charset=UTF-8',
+        // Set to true to make virtual hosted-style requests.
+        use_virtual: false
     },
 
     // Initialize object (called from constructor)
@@ -49,7 +51,8 @@ S3Ajax.prototype = {
     get: function (bucket, key, cb, err_cb) {
         return this.httpClient({
             method: 'GET',
-            resource: '/' + bucket + '/' + key,
+            key: key,
+            bucket: bucket,
             load: cb, error: err_cb 
         });
     },
@@ -58,7 +61,8 @@ S3Ajax.prototype = {
     head: function (bucket, key, cb, err_cb) {
         return this.httpClient({
             method: 'HEAD',
-            resource: '/' + bucket + '/' + key,
+            key: key,
+            bucket: bucket,
             load: cb, error: err_cb 
         });
     },
@@ -84,7 +88,8 @@ S3Ajax.prototype = {
 
         return this.httpClient({
             method:       'PUT',
-            resource:     '/' + bucket + '/' + key,
+            key:          key,
+            bucket:       bucket,
             content:      content,
             content_type: params.content_type,
             meta:         params.meta,
@@ -166,7 +171,11 @@ S3Ajax.prototype = {
 
         // Prepare the query string and URL for this request.
         var qs   = (kwArgs.params) ? '?'+this.queryString(kwArgs.params) : '';
-        var url  = this.base_url + kwArgs.resource + qs;
+        if (this.use_virtual)
+            var resource = '/' + kwArgs.key;
+        else
+            var resource = '/' + kwArgs.bucket + '/' + kwArgs.key;
+        var url = this.base_url + resource + qs;
         var hdrs = {};
 
         // Handle Content-Type header
@@ -222,7 +231,7 @@ S3Ajax.prototype = {
                 acl_header_to_sign,
                 'x-amz-date:', http_date, "\n",
                 meta_to_sign,
-                kwArgs.resource
+                '/' + kwArgs.bucket + '/' + kwArgs.key
             ].join('');
 
             // Sign the string with our secret_key.
