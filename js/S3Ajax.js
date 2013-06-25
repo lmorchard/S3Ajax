@@ -392,7 +392,7 @@ S3Ajax.prototype = {
         var k, l = [];
         for (k in params) {
             if (params.hasOwnProperty(k)) {
-                l.push(k+'='+encodeURIComponent(params[k]));
+                l.push(k + (params[k] ? '=' + encodeURIComponent(params[k]) : ''));
             }
         }
         return l.join("&");
