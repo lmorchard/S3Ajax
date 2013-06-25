@@ -170,7 +170,23 @@ S3Ajax.prototype = {
         }
 
         // Prepare the query string and URL for this request.
-        var qs   = (kwArgs.params) ? '?'+this.queryString(kwArgs.params) : '';
+        var qs = '', sub_qs = '';
+        if (kwArgs.params) {
+            qs = '?'+this.queryString(kwArgs.params);
+            // Sub-resource parameters, if present, must be included in CanonicalizedResources.
+            // NOTE: These paramters must be sorted lexicographically in StringToSign.
+            var subresource_params = {};
+            var subresource_params_all = ["acl", "lifecycle", "location", "logging",
+                                          "notification", "partNumber", "policy",
+                                          "requestPayment", "torrent", "uploadId",
+                                          "uploads", "versionId", "versioning",
+                                          "versions", "website"];
+            for (var k in subresource_params_all)
+                if (subresource_params_all[k] in kwArgs.params)
+                    subresource_params[subresource_params_all[k]] = kwArgs.params[subresource_params_all[k]];
+            sub_qs = Object.keys(subresource_params).length ? '?' + this.queryString(subresource_params) : '';
+        }
+
         if (this.use_virtual)
             var resource = '/' + kwArgs.key;
         else
@@ -231,7 +247,8 @@ S3Ajax.prototype = {
                 acl_header_to_sign,
                 'x-amz-date:', http_date, "\n",
                 meta_to_sign,
-                '/' + kwArgs.bucket + '/' + kwArgs.key
+                '/' + kwArgs.bucket + '/' + kwArgs.key,
+                sub_qs
             ].join('');
 
             // Sign the string with our secret_key.
