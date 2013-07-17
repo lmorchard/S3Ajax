@@ -23,6 +23,8 @@ S3Ajax.prototype = {
         key_id: null,
         // Secret key for credentials
         secret_key: null,
+        // Security token (required when using temporary credentials)
+        security_token: null,
         // Flip this to true to potentially get lots of wonky logging.
         debug: false,
         // Defeat caching with query params on GET requests?
@@ -223,7 +225,10 @@ S3Ajax.prototype = {
             hdrs['x-amz-acl'] = kwArgs.acl;
             acl_header_to_sign = "x-amz-acl:"+kwArgs.acl+"\n";
         }
-        
+
+        if (this.security_token)
+            hdrs['x-amz-security-token'] = this.security_token;
+
         // Handle the metadata headers
         var meta_to_sign = '';
         if (kwArgs.meta) {
@@ -246,6 +251,7 @@ S3Ajax.prototype = {
                 "\n", // was Date header, no longer works with modern browsers.
                 acl_header_to_sign,
                 'x-amz-date:', http_date, "\n",
+                this.security_token ? 'x-amz-security-token:' + this.security_token + "\n": '',
                 meta_to_sign,
                 '/' + kwArgs.bucket + '/' + kwArgs.key,
                 sub_qs
