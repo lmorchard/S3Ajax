@@ -23,6 +23,8 @@ S3Ajax.prototype = {
         key_id: null,
         // Secret key for credentials
         secret_key: null,
+        // Security token (required when using temporary credentials)
+        security_token: null,
         // Flip this to true to potentially get lots of wonky logging.
         debug: false,
         // Defeat caching with query params on GET requests?
@@ -30,7 +32,9 @@ S3Ajax.prototype = {
         // Default ACL to use when uploading keys.
         default_acl: 'public-read',
         // Default content-type to use in uploading keys.
-        default_content_type: 'text/plain; charset=UTF-8'
+        default_content_type: 'text/plain; charset=UTF-8',
+        // Set to true to make virtual hosted-style requests.
+        use_virtual: false
     },
 
     // Initialize object (called from constructor)
@@ -49,7 +53,8 @@ S3Ajax.prototype = {
     get: function (bucket, key, cb, err_cb) {
         return this.httpClient({
             method: 'GET',
-            resource: '/' + bucket + '/' + key,
+            key: key,
+            bucket: bucket,
             load: cb, error: err_cb 
         });
     },
@@ -58,7 +63,8 @@ S3Ajax.prototype = {
     head: function (bucket, key, cb, err_cb) {
         return this.httpClient({
             method: 'HEAD',
-            resource: '/' + bucket + '/' + key,
+            key: key,
+            bucket: bucket,
             load: cb, error: err_cb 
         });
     },
@@ -84,7 +90,8 @@ S3Ajax.prototype = {
 
         return this.httpClient({
             method:       'PUT',
-            resource:     '/' + bucket + '/' + key,
+            key:          key,
+            bucket:       bucket,
             content:      content,
             content_type: params.content_type,
             meta:         params.meta,
@@ -165,8 +172,28 @@ S3Ajax.prototype = {
         }
 
         // Prepare the query string and URL for this request.
-        var qs   = (kwArgs.params) ? '?'+this.queryString(kwArgs.params) : '';
-        var url  = this.base_url + kwArgs.resource + qs;
+        var qs = '', sub_qs = '';
+        if (kwArgs.params) {
+            qs = '?'+this.queryString(kwArgs.params);
+            // Sub-resource parameters, if present, must be included in CanonicalizedResources.
+            // NOTE: These paramters must be sorted lexicographically in StringToSign.
+            var subresource_params = {};
+            var subresource_params_all = ["acl", "lifecycle", "location", "logging",
+                                          "notification", "partNumber", "policy",
+                                          "requestPayment", "torrent", "uploadId",
+                                          "uploads", "versionId", "versioning",
+                                          "versions", "website"];
+            for (var k in subresource_params_all)
+                if (subresource_params_all[k] in kwArgs.params)
+                    subresource_params[subresource_params_all[k]] = kwArgs.params[subresource_params_all[k]];
+            sub_qs = Object.keys(subresource_params).length ? '?' + this.queryString(subresource_params) : '';
+        }
+
+        if (this.use_virtual)
+            var resource = '/' + kwArgs.key;
+        else
+            var resource = '/' + kwArgs.bucket + '/' + kwArgs.key;
+        var url = this.base_url + resource + qs;
         var hdrs = {};
 
         // Handle Content-Type header
@@ -198,7 +225,10 @@ S3Ajax.prototype = {
             hdrs['x-amz-acl'] = kwArgs.acl;
             acl_header_to_sign = "x-amz-acl:"+kwArgs.acl+"\n";
         }
-        
+
+        if (this.security_token)
+            hdrs['x-amz-security-token'] = this.security_token;
+
         // Handle the metadata headers
         var meta_to_sign = '';
         if (kwArgs.meta) {
@@ -221,8 +251,10 @@ S3Ajax.prototype = {
                 "\n", // was Date header, no longer works with modern browsers.
                 acl_header_to_sign,
                 'x-amz-date:', http_date, "\n",
+                this.security_token ? 'x-amz-security-token:' + this.security_token + "\n": '',
                 meta_to_sign,
-                kwArgs.resource
+                '/' + kwArgs.bucket + '/' + kwArgs.key,
+                sub_qs
             ].join('');
 
             // Sign the string with our secret_key.
@@ -366,7 +398,7 @@ S3Ajax.prototype = {
         var k, l = [];
         for (k in params) {
             if (params.hasOwnProperty(k)) {
-                l.push(k+'='+encodeURIComponent(params[k]));
+                l.push(k + (params[k] ? '=' + encodeURIComponent(params[k]) : ''));
             }
         }
         return l.join("&");
