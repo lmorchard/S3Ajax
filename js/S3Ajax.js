@@ -189,10 +189,15 @@ S3Ajax.prototype = {
             sub_qs = Object.keys(subresource_params).length ? '?' + this.queryString(subresource_params) : '';
         }
 
-        if (this.use_virtual)
-            var resource = '/' + kwArgs.key;
-        else
-            var resource = '/' + kwArgs.bucket + '/' + kwArgs.key;
+        var resource, sig_resource;
+        if (kwArgs.resource) {
+            resource = sig_resource = kwArgs.resource;
+        } else if (this.use_virtual) {
+            resource = '/' + kwArgs.key;
+            sig_resource = '/' + kwArgs.bucket + '/' + kwArgs.key;
+        } else {
+            resource = sig_resource = '/' + kwArgs.bucket + '/' + kwArgs.key;
+        }
         var url = this.base_url + resource + qs;
         var hdrs = {};
 
@@ -253,7 +258,7 @@ S3Ajax.prototype = {
                 'x-amz-date:', http_date, "\n",
                 this.security_token ? 'x-amz-security-token:' + this.security_token + "\n": '',
                 meta_to_sign,
-                '/' + kwArgs.bucket + '/' + kwArgs.key,
+                sig_resource,
                 sub_qs
             ].join('');
 
